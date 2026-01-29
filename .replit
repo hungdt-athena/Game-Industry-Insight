@@ -4,7 +4,7 @@ run = "npm run dev"
 channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "npm run build && npm run preview"]
-build = ["sh", "-c", "npm install"]
+build = ["sh", "-c", "cd frontend && npm install && npm run build"]
+run = ["sh", "-c", "npx -y serve frontend/dist -p 5000"]
 deploymentTarget = "static"
 publicDir = "frontend/dist"
