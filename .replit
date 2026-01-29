@@ -1,0 +1,10 @@
+run = "npm run dev"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm run build && npm run preview"]
+build = ["sh", "-c", "npm install"]
+deploymentTarget = "static"
+publicDir = "frontend/dist"

@@ -1,0 +1,21 @@
+{
+    "name": "insight-library-monorepo",
+    "version": "1.0.0",
+    "description": "Insight Library Monorepo Workspace",
+    "private": true,
+    "scripts": {
+        "dev": "npm run dev --prefix frontend",
+        "build": "npm run build --prefix frontend",
+        "preview": "npm run preview --prefix frontend",
+        "install:all": "npm install && npm install --prefix frontend",
+        "lint": "npm run lint --prefix frontend"
+    },
+    "workspaces": [
+        "frontend",
+        "backend",
+        "shared"
+    ],
+    "dependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
