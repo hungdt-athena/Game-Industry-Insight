@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, ClipboardList, Clock, User, ArrowRight, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ClipboardList, Clock, ArrowRight, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabase';
 
