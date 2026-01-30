@@ -1,20 +1,79 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDown, LayoutGrid, List, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import { useFeedPosts } from '@/lib/queries';
+import { useState, useEffect, useMemo } from 'react';
+// import { useFeedPosts } from '@/lib/queries'; // OLD VERSION
+import { useFeedPostsOptimized as useFeedPosts } from '@/lib/hooks'; // NEW OPTIMIZED VERSION
 import { MasonryGrid } from '@/components/MasonryGrid';
 import { ListView } from '@/components/ListView';
 import { useViewMode } from '@/hooks/useViewMode';
+import { postUpdateEvents } from '@/lib/savedPostsEvents';
+import type { InsightCardData } from '@/lib/types';
 
-type SortOption = 'relevance' | 'date' | 'popular';
+type SortOption = 'date' | 'popular';
 
 export function GalleryPage() {
-    const [sortBy, setSortBy] = useState<SortOption>('relevance');
+    const [sortBy, setSortBy] = useState<SortOption>('date');
     const { viewMode, setViewMode } = useViewMode();
     const { data: posts, isLoading, error } = useFeedPosts({ limit: 30 });
 
+    // Local state to track count updates
+    const [countUpdates, setCountUpdates] = useState<Record<string, { likes: number; saves: number }>>({});
+
+    // Subscribe to post updates (like/save actions)
+    useEffect(() => {
+        const unsubscribe = postUpdateEvents.subscribe((postId, action) => {
+            setCountUpdates(prev => {
+                const current = prev[postId] || { likes: 0, saves: 0 };
+                return {
+                    ...prev,
+                    [postId]: {
+                        likes: current.likes + (action === 'like' ? 1 : action === 'unlike' ? -1 : 0),
+                        saves: current.saves + (action === 'save' ? 1 : action === 'unsave' ? -1 : 0),
+                    }
+                };
+            });
+        });
+        return () => { unsubscribe(); };
+    }, []);
+
+    // Merge fetched posts with count updates
+    const updatedPosts: InsightCardData[] = useMemo(() => {
+        if (!posts) return [];
+        return posts.map(post => {
+            const update = countUpdates[post.id];
+            if (!update) return post;
+            return {
+                ...post,
+                likes_count: Math.max(0, (post.likes_count || 0) + update.likes),
+                saves_count: Math.max(0, (post.saves_count || 0) + update.saves),
+            };
+        });
+    }, [posts, countUpdates]);
+
+    // Sort posts based on selected option
+    const sortedPosts: InsightCardData[] = useMemo(() => {
+        if (!updatedPosts.length) return [];
+
+        const sorted = [...updatedPosts];
+        if (sortBy === 'date') {
+            // Sort by published_date descending (newest first)
+            sorted.sort((a, b) => {
+                const dateA = a.published_date ? new Date(a.published_date).getTime() : 0;
+                const dateB = b.published_date ? new Date(b.published_date).getTime() : 0;
+                return dateB - dateA;
+            });
+        } else if (sortBy === 'popular') {
+            // Sort by total engagement (likes + saves) descending
+            sorted.sort((a, b) => {
+                const engagementA = (a.likes_count || 0) + (a.saves_count || 0);
+                const engagementB = (b.likes_count || 0) + (b.saves_count || 0);
+                return engagementB - engagementA;
+            });
+        }
+        return sorted;
+    }, [updatedPosts, sortBy]);
+
     const sortLabels: Record<SortOption, string> = {
-        relevance: 'Relevance',
         date: 'Date',
         popular: 'Popular',
     };
@@ -101,7 +160,7 @@ export function GalleryPage() {
 
             {/* Feed - Switch between Grid and List view */}
             {viewMode === 'grid' ? (
-                <MasonryGrid posts={posts || []} isLoading={isLoading} />
+                <MasonryGrid posts={sortedPosts} isLoading={isLoading} />
             ) : (
                 isLoading ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -116,7 +175,7 @@ export function GalleryPage() {
                         ))}
                     </div>
                 ) : (
-                    <ListView posts={posts || []} />
+                    <ListView posts={sortedPosts} />
                 )
             )}
 

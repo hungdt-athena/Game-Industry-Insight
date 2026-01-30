@@ -1,7 +1,7 @@
 import { useParams } from 'wouter';
 import { LayoutGrid, List } from 'lucide-react';
 import { FeedSkeleton } from '@/components/Skeletons';
-import { useFeedPosts } from '@/lib/queries';
+import { useFeedPostsOptimized } from '@/lib/hooks';
 import { MasonryGrid } from '@/components/MasonryGrid';
 import { ListView } from '@/components/ListView';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -35,8 +35,8 @@ export function TagPage() {
         enabled: !!tagId,
     });
 
-    // Fetch posts for this tag
-    const { data: posts, isLoading } = useFeedPosts({ tagId });
+    // Fetch posts for this tag (using optimized query with likes/saves counts)
+    const { data: posts, isLoading } = useFeedPostsOptimized({ tagId });
 
     return (
         <div className="space-y-6">

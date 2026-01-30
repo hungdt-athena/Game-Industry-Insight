@@ -12,6 +12,7 @@ export const TagSchema = z.object({
     id: z.string().uuid(),
     name: z.string(),
     type: z.enum(['CATEGORY', 'TOPIC', 'ENTITY']),
+    slug: z.string().nullable().optional(),
     metadata: z.object({
         icon: z.string().optional(),
         badge_bg: z.string().optional(),
@@ -83,5 +84,7 @@ export type CardType = 'image' | 'quote';
 export interface InsightCardData extends FeedPost {
     cardType: CardType;
     tags?: Tag[];  // Optional tags for hover display
+    likes_count?: number;  // Number of likes on this post
+    saves_count?: number;  // Number of saves on this post
 }
 

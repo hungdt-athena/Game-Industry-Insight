@@ -1,7 +1,8 @@
 import { useParams } from 'wouter';
 import { LayoutGrid, List } from 'lucide-react';
 import { FeedSkeleton } from '@/components/Skeletons';
-import { useFeedPosts, useCategories } from '@/lib/queries';
+import { useCategories } from '@/lib/queries';
+import { useFeedPostsOptimized } from '@/lib/hooks';
 import { MasonryGrid } from '@/components/MasonryGrid';
 import { ListView } from '@/components/ListView';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -11,8 +12,8 @@ export function CategoryPage() {
     const categoryId = params.id;
     const { viewMode, setViewMode } = useViewMode();
 
-    // Fetch posts for this category
-    const { data: posts, isLoading } = useFeedPosts({ categoryId });
+    // Fetch posts for this category using optimized query (includes likes/saves counts)
+    const { data: posts, isLoading } = useFeedPostsOptimized({ categoryId });
     const { data: categories } = useCategories();
 
     // Find current category name

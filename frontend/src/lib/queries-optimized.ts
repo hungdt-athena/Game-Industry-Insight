@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { FeedPost, InsightCardData, FeedQueryParams, Tag, Author, RelatedPost } from './types';
+import type { InsightCardData, FeedQueryParams, Tag, Author } from './types';
 
 // OPTIMIZED VERSION - Single query with all JOINs
 export async function getFeedPostsOptimized(params: FeedQueryParams = {}): Promise<InsightCardData[]> {
@@ -46,7 +46,9 @@ export async function getFeedPostsOptimized(params: FeedQueryParams = {}): Promi
                     type,
                     slug
                 )
-            )
+            ),
+            post_likes (id),
+            user_saved_posts (id)
         `)
         .order('created_at', { ascending: false });
 
@@ -111,6 +113,8 @@ export async function getFeedPostsOptimized(params: FeedQueryParams = {}): Promi
             category: categoryTag,
             cardType,
             tags: allTags,
+            likes_count: post.post_likes?.length || 0,
+            saves_count: post.user_saved_posts?.length || 0,
         };
     });
 }

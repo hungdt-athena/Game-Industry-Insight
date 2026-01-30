@@ -1,4 +1,5 @@
 import { Link } from 'wouter';
+import { Heart, Bookmark } from 'lucide-react';
 import type { InsightCardData } from '@/lib/types';
 import { TagChip } from './TagChip';
 import { getCategoryColorByName, DEFAULT_CATEGORY_COLOR } from '@/lib/categoryColors';
@@ -117,27 +118,50 @@ function ImageCard({ post }: InsightCardProps) {
                     )}
 
                     {author && (
-                        <div className="mt-2 flex items-center gap-2">
-                            {author.avatar_url ? (
-                                <img
-                                    src={author.avatar_url}
-                                    alt={author.name}
-                                    className="w-6 h-6 rounded-full object-cover"
-                                />
-                            ) : (
-                                <div
-                                    className="w-6 h-6 rounded-full flex items-center justify-center"
-                                    style={{
-                                        backgroundColor: categoryColorConfig.colorHex + '20',
-                                        color: categoryColorConfig.colorHex
-                                    }}
-                                >
-                                    <span className="text-xs font-medium">
-                                        {author.name.charAt(0)}
+                        <div className="mt-2 flex items-center justify-between">
+                            <a
+                                href={`/author/${author.id}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                }}
+                                className="flex items-center gap-2 hover:opacity-75 transition-opacity z-10 relative"
+                            >
+                                {author.avatar_url ? (
+                                    <img
+                                        src={author.avatar_url}
+                                        alt={author.name}
+                                        className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <div
+                                        className="w-6 h-6 rounded-full flex items-center justify-center"
+                                        style={{
+                                            backgroundColor: categoryColorConfig.colorHex + '20',
+                                            color: categoryColorConfig.colorHex
+                                        }}
+                                    >
+                                        <span className="text-xs font-medium">
+                                            {author.name.charAt(0)}
+                                        </span>
+                                    </div>
+                                )}
+                                <span className="text-sm text-slate-500 hover:text-slate-700 hover:underline">{author.name}</span>
+                            </a>
+                            {/* Likes and Saves counts */}
+                            <div className="flex items-center gap-3 text-xs text-slate-400">
+                                {(post.likes_count ?? 0) > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <Heart className="w-3.5 h-3.5" />
+                                        {post.likes_count}
                                     </span>
-                                </div>
-                            )}
-                            <span className="text-sm text-slate-500">{author.name}</span>
+                                )}
+                                {(post.saves_count ?? 0) > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <Bookmark className="w-3.5 h-3.5" />
+                                        {post.saves_count}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -203,24 +227,47 @@ function QuoteCard({ post }: InsightCardProps) {
 
                 {/* Author */}
                 {author && (
-                    <div className="mt-4 flex items-center gap-2">
-                        {author.avatar_url ? (
-                            <img
-                                src={author.avatar_url}
-                                alt={author.name}
-                                className="w-7 h-7 rounded-full object-cover border-2 border-white/30"
-                            />
-                        ) : (
-                            <div
-                                className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-white/30"
-                                style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                            >
-                                <span className="text-xs font-medium text-white">
-                                    {author.name.charAt(0)}
+                    <div className="mt-4 flex items-center justify-between">
+                        <a
+                            href={`/author/${author.id}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                            }}
+                            className="flex items-center gap-2 hover:opacity-75 transition-opacity z-10 relative"
+                        >
+                            {author.avatar_url ? (
+                                <img
+                                    src={author.avatar_url}
+                                    alt={author.name}
+                                    className="w-7 h-7 rounded-full object-cover border-2 border-white/30"
+                                />
+                            ) : (
+                                <div
+                                    className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-white/30"
+                                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+                                >
+                                    <span className="text-xs font-medium text-white">
+                                        {author.name.charAt(0)}
+                                    </span>
+                                </div>
+                            )}
+                            <span className="text-sm text-white/90 hover:underline">{author.name}</span>
+                        </a>
+                        {/* Likes and Saves counts */}
+                        <div className="flex items-center gap-3 text-xs text-white/70">
+                            {(post.likes_count ?? 0) > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <Heart className="w-3.5 h-3.5" />
+                                    {post.likes_count}
                                 </span>
-                            </div>
-                        )}
-                        <span className="text-sm text-white/90">{author.name}</span>
+                            )}
+                            {(post.saves_count ?? 0) > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <Bookmark className="w-3.5 h-3.5" />
+                                    {post.saves_count}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 )}
 

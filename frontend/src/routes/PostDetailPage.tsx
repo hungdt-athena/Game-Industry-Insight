@@ -1,5 +1,5 @@
 import { Link, useParams } from 'wouter';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     ArrowLeft,
     Heart,
@@ -7,18 +7,85 @@ import {
     Clock,
     ExternalLink,
     X,
+    UserPlus,
+    UserMinus,
+    Loader2,
 } from 'lucide-react';
 import { usePostDetail, useRelatedPostsByCategory, useRandomPosts } from '@/lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
+import {
+    isPostLiked,
+    likePost,
+    unlikePost,
+    getPostLikeCount,
+    isPostSaved,
+    savePost,
+    unsavePost,
+    isFollowingAuthor,
+    followAuthor,
+    unfollowAuthor,
+} from '@/lib/queries-auth';
 import { TagChip } from '@/components/TagChip';
 import { RelatedPostsSection } from '@/components/RelatedPosts';
 import { PostDetailSkeleton } from '@/components/Skeletons';
 import { getCategoryColorByName, DEFAULT_CATEGORY_COLOR } from '@/lib/categoryColors';
 import { formatContentRaw } from '@/lib/textUtils';
+import { savedPostsEvents, postUpdateEvents } from '@/lib/savedPostsEvents';
 
 export function PostDetailPage() {
     const params = useParams<{ id: string }>();
+    const queryClient = useQueryClient();
     const { data: post, isLoading, error } = usePostDetail(params.id);
+    const { user, isAuthenticated } = useAuth();
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+    // Interaction states
+    const [liked, setLiked] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
+    const [likeLoading, setLikeLoading] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [saveLoading, setSaveLoading] = useState(false);
+    const [following, setFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    // Load interaction states when authenticated
+    useEffect(() => {
+        if (!isAuthenticated || !user || !params.id) return;
+
+        const loadInteractionStates = async () => {
+            try {
+                const [isLiked, isSaved, likeCountResult] = await Promise.all([
+                    isPostLiked(user.id, params.id!),
+                    isPostSaved(user.id, params.id!),
+                    getPostLikeCount(params.id!),
+                ]);
+                setLiked(isLiked);
+                setSaved(isSaved);
+                setLikeCount(likeCountResult);
+            } catch (error) {
+                console.error('Failed to load interaction states:', error);
+            }
+        };
+
+        loadInteractionStates();
+    }, [isAuthenticated, user, params.id]);
+
+    // Load follow state for author
+    useEffect(() => {
+        if (!isAuthenticated || !user || !post?.author?.id) return;
+
+        const loadFollowState = async () => {
+            try {
+                const isFollowing = await isFollowingAuthor(user.id, post.author!.id);
+                setFollowing(isFollowing);
+            } catch (error) {
+                console.error('Failed to load follow state:', error);
+            }
+        };
+
+        loadFollowState();
+    }, [isAuthenticated, user, post?.author?.id]);
 
     // Extract category for related posts query (safe even if post is null)
     const categoryId = post?.tags?.find(t => t.type === 'CATEGORY')?.id;
@@ -31,6 +98,74 @@ export function PostDetailPage() {
     );
     const { data: randomPosts, isLoading: randomPostsLoading } = useRandomPosts(params.id, 4);
 
+    const handleLike = async () => {
+        if (!isAuthenticated || !user || !params.id || likeLoading) return;
+
+        setLikeLoading(true);
+        try {
+            if (liked) {
+                await unlikePost(user.id, params.id);
+                setLiked(false);
+                setLikeCount(prev => Math.max(0, prev - 1));
+                postUpdateEvents.emit(params.id, 'unlike');
+            } else {
+                await likePost(user.id, params.id);
+                setLiked(true);
+                setLikeCount(prev => prev + 1);
+                postUpdateEvents.emit(params.id, 'like');
+            }
+            // Invalidate feed cache so it refetches with updated counts
+            queryClient.invalidateQueries({ queryKey: ['feed-posts-optimized'] });
+        } catch (error) {
+            console.error('Failed to toggle like:', error);
+        } finally {
+            setLikeLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!isAuthenticated || !user || !params.id || saveLoading) return;
+
+        setSaveLoading(true);
+        try {
+            if (saved) {
+                await unsavePost(user.id, params.id);
+                setSaved(false);
+                postUpdateEvents.emit(params.id, 'unsave');
+            } else {
+                await savePost(user.id, params.id);
+                setSaved(true);
+                postUpdateEvents.emit(params.id, 'save');
+            }
+            // Emit event to refresh Header saved posts
+            savedPostsEvents.emit();
+            // Invalidate feed cache so it refetches with updated counts
+            queryClient.invalidateQueries({ queryKey: ['feed-posts-optimized'] });
+        } catch (error) {
+            console.error('Failed to toggle save:', error);
+        } finally {
+            setSaveLoading(false);
+        }
+    };
+
+    const handleFollow = async () => {
+        if (!isAuthenticated || !user || !post?.author?.id || followLoading) return;
+
+        setFollowLoading(true);
+        try {
+            if (following) {
+                await unfollowAuthor(user.id, post.author.id);
+                setFollowing(false);
+            } else {
+                await followAuthor(user.id, post.author.id);
+                setFollowing(true);
+            }
+        } catch (error) {
+            console.error('Failed to toggle follow:', error);
+        } finally {
+            setFollowLoading(false);
+        }
+    };
 
     if (isLoading) {
         return <PostDetailSkeleton />;
@@ -139,7 +274,10 @@ export function PostDetailPage() {
                     {/* Author Section */}
                     {post.author && (
                         <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-100">
-                            <div className="flex items-center gap-3">
+                            <a
+                                href={`/author/${post.author.id}`}
+                                className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                            >
                                 {post.author.avatar_url ? (
                                     <img
                                         src={post.author.avatar_url}
@@ -153,18 +291,40 @@ export function PostDetailPage() {
                                         </span>
                                     </div>
                                 )}
-                                <div>
-                                    <div className="font-medium text-slate-900">
-                                        {post.author.name}
-                                    </div>
-                                    <div className="text-sm text-slate-500">
-                                        Research Analyst
-                                    </div>
+                                <div className="font-medium text-slate-900 hover:text-primary-600 hover:underline">
+                                    {post.author.name}
                                 </div>
-                            </div>
-                            <button className="px-4 py-1.5 border border-primary-500 text-primary-600 text-sm font-medium rounded-full hover:bg-primary-50 transition-colors">
-                                + Follow
-                            </button>
+                            </a>
+                            {isAuthenticated ? (
+                                <button
+                                    onClick={handleFollow}
+                                    disabled={followLoading}
+                                    className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${following
+                                        ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                                        : 'border border-primary-500 text-primary-600 hover:bg-primary-50'
+                                        }`}
+                                >
+                                    {followLoading ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : following ? (
+                                        <>
+                                            <UserMinus className="w-4 h-4" />
+                                            Following
+                                        </>
+                                    ) : (
+                                        <>
+                                            <UserPlus className="w-4 h-4" />
+                                            Follow
+                                        </>
+                                    )}
+                                </button>
+                            ) : (
+                                <Link href="/login">
+                                    <button className="px-4 py-1.5 border border-primary-500 text-primary-600 text-sm font-medium rounded-full hover:bg-primary-50 transition-colors">
+                                        + Follow
+                                    </button>
+                                </Link>
+                            )}
                         </div>
                     )}
                 </div>
@@ -172,13 +332,43 @@ export function PostDetailPage() {
                 {/* Action Bar */}
                 <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-slate-50">
                     <div className="flex items-center gap-4">
-                        <button className="flex items-center gap-1.5 text-slate-500 hover:text-red-500 transition-colors">
-                            <Heart className="w-5 h-5" />
-                            <span className="text-sm">Like</span>
+                        <button
+                            onClick={handleLike}
+                            disabled={!isAuthenticated || likeLoading}
+                            className={`flex items-center gap-1.5 transition-colors ${!isAuthenticated
+                                ? 'text-slate-400 cursor-not-allowed'
+                                : liked
+                                    ? 'text-red-500 hover:text-red-600'
+                                    : 'text-slate-500 hover:text-red-500'
+                                }`}
+                            title={!isAuthenticated ? 'Sign in to like' : liked ? 'Unlike' : 'Like'}
+                        >
+                            {likeLoading ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Heart className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} />
+                            )}
+                            <span className="text-sm">
+                                {likeCount > 0 ? likeCount : ''} {liked ? 'Liked' : 'Like'}
+                            </span>
                         </button>
-                        <button className="flex items-center gap-1.5 text-slate-500 hover:text-yellow-600 transition-colors">
-                            <Bookmark className="w-5 h-5" />
-                            <span className="text-sm">Save</span>
+                        <button
+                            onClick={handleSave}
+                            disabled={!isAuthenticated || saveLoading}
+                            className={`flex items-center gap-1.5 transition-colors ${!isAuthenticated
+                                ? 'text-slate-400 cursor-not-allowed'
+                                : saved
+                                    ? 'text-yellow-600 hover:text-yellow-700'
+                                    : 'text-slate-500 hover:text-yellow-600'
+                                }`}
+                            title={!isAuthenticated ? 'Sign in to save' : saved ? 'Unsave' : 'Save'}
+                        >
+                            {saveLoading ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Bookmark className={`w-5 h-5 ${saved ? 'fill-current' : ''}`} />
+                            )}
+                            <span className="text-sm">{saved ? 'Saved' : 'Save'}</span>
                         </button>
                     </div>
                     {/* Original article button */}

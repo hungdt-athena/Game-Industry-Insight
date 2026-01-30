@@ -1,6 +1,8 @@
-import { Link } from 'wouter';
+import { useState } from 'react';
+import { Link, useLocation } from 'wouter';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
     BookOpen,
     Gamepad2,
@@ -10,23 +12,26 @@ import {
     ChevronRight,
     X,
     Menu,
+    LogIn,
+    Settings,
+    LogOut,
+    ShieldCheck,
+    User,
+    ClipboardList,
 } from 'lucide-react';
 import { useCategories, useTrendingTags } from '@/lib/queries';
+import { useAuth } from '@/lib/AuthContext';
 import { TagChip } from './TagChip';
 import { SidebarSkeleton } from './Skeletons';
+import { UserManagementDialog } from './UserManagementDialog';
+import { SettingsDialog } from './SettingsDialog';
+import { ActivityLogsDialog } from './ActivityLogsDialog';
 
 interface SidebarProps {
     selectedCategory?: string;
     isMobileOpen: boolean;
     onMobileClose: () => void;
 }
-
-// Mock user data for the profile section
-const mockUser = {
-    name: 'Alex Designer',
-    role: 'UI Researcher',
-    avatar: null,
-};
 
 // Category icon mapping
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -37,11 +42,28 @@ const categoryIcons: Record<string, React.ReactNode> = {
     default: <BookOpen className="w-4 h-4" />,
 };
 
+const roleColors: Record<string, string> = {
+    admin: 'text-purple-600',
+    moderator: 'text-blue-600',
+    user: 'text-slate-500',
+};
+
 function SidebarContent({
     selectedCategory,
 }: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose'>) {
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: trendingTags, isLoading: tagsLoading } = useTrendingTags();
+    const { user, isAuthenticated, isAdmin, isModerator, logout } = useAuth();
+    const [, setLocation] = useLocation();
+
+    const [userManagementOpen, setUserManagementOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [activityLogsOpen, setActivityLogsOpen] = useState(false);
+
+    const handleLogout = async () => {
+        await logout();
+        setLocation('/login');
+    };
 
     if (categoriesLoading || tagsLoading) {
         return <SidebarSkeleton />;
@@ -64,25 +86,92 @@ function SidebarContent({
 
             {/* User Profile */}
             <div className="p-4 border-b border-slate-200">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
-                        {mockUser.avatar ? (
-                            <img
-                                src={mockUser.avatar}
-                                alt={mockUser.name}
-                                className="w-full h-full rounded-full object-cover"
-                            />
-                        ) : (
-                            <span className="text-white font-medium">
-                                {mockUser.name.charAt(0)}
-                            </span>
-                        )}
-                    </div>
-                    <div>
-                        <div className="font-medium text-slate-900">{mockUser.name}</div>
-                        <div className="text-xs text-slate-500">{mockUser.role}</div>
-                    </div>
-                </div>
+                {isAuthenticated && user ? (
+                    <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
+                            <button className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
+                                    {user.avatar_url ? (
+                                        <img
+                                            src={user.avatar_url}
+                                            alt={user.display_name || 'User'}
+                                            className="w-full h-full rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="text-white font-medium">
+                                            {(user.display_name || user.email).charAt(0).toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-left flex-1">
+                                    <div className="font-medium text-slate-900">
+                                        {user.display_name || user.email.split('@')[0]}
+                                    </div>
+                                    <div className={`text-xs capitalize ${roleColors[user.role]}`}>
+                                        {user.role}
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-slate-400" />
+                            </button>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                                className="min-w-[200px] bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50 p-1"
+                                sideOffset={8}
+                                align="start"
+                            >
+                                {isModerator && (
+                                    <DropdownMenu.Item
+                                        onClick={() => setUserManagementOpen(true)}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer outline-none"
+                                    >
+                                        <ShieldCheck className="w-4 h-4" />
+                                        User Management
+                                    </DropdownMenu.Item>
+                                )}
+                                {isAdmin && (
+                                    <DropdownMenu.Item
+                                        onClick={() => setActivityLogsOpen(true)}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer outline-none"
+                                    >
+                                        <ClipboardList className="w-4 h-4" />
+                                        Activity Logs
+                                    </DropdownMenu.Item>
+                                )}
+                                <Link href="/profile">
+                                    <DropdownMenu.Item
+                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer outline-none"
+                                    >
+                                        <User className="w-4 h-4" />
+                                        Profile
+                                    </DropdownMenu.Item>
+                                </Link>
+                                <DropdownMenu.Item
+                                    onClick={() => setSettingsOpen(true)}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer outline-none"
+                                >
+                                    <Settings className="w-4 h-4" />
+                                    Settings
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Separator className="h-px bg-slate-200 my-1" />
+                                <DropdownMenu.Item
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg cursor-pointer outline-none"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    Sign Out
+                                </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                ) : (
+                    <Link href="/login">
+                        <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+                            <LogIn className="w-4 h-4" />
+                            Sign In
+                        </button>
+                    </Link>
+                )}
             </div>
 
             {/* Scrollable Content */}
@@ -154,6 +243,20 @@ function SidebarContent({
                     <ScrollArea.Thumb className="flex-1 bg-slate-300 rounded-full relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]" />
                 </ScrollArea.Scrollbar>
             </ScrollArea.Root>
+
+            {/* Dialogs */}
+            <UserManagementDialog
+                open={userManagementOpen}
+                onOpenChange={setUserManagementOpen}
+            />
+            <SettingsDialog
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+            />
+            <ActivityLogsDialog
+                open={activityLogsOpen}
+                onOpenChange={setActivityLogsOpen}
+            />
         </div>
     );
 }

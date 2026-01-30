@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { InsightCardData } from '@/lib/types';
 import { InsightCard } from './InsightCard';
 import { FeedSkeleton } from './Skeletons';
@@ -8,6 +9,20 @@ interface MasonryGridProps {
 }
 
 export function MasonryGrid({ posts, isLoading }: MasonryGridProps) {
+    // Distribute posts into columns in row-first order
+    // For 3 columns: post 0 -> col 0, post 1 -> col 1, post 2 -> col 2, post 3 -> col 0, etc.
+    const columns = useMemo(() => {
+        const numCols = 3; // lg:columns-3
+        const cols: InsightCardData[][] = Array.from({ length: numCols }, () => []);
+
+        posts.forEach((post, index) => {
+            const colIndex = index % numCols;
+            cols[colIndex].push(post);
+        });
+
+        return cols;
+    }, [posts]);
+
     if (isLoading) {
         return <FeedSkeleton />;
     }
@@ -39,9 +54,13 @@ export function MasonryGrid({ posts, isLoading }: MasonryGridProps) {
     }
 
     return (
-        <div className="columns-1 md:columns-2 lg:columns-3 gap-4">
-            {posts.map((post) => (
-                <InsightCard key={post.id} post={post} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+            {columns.map((columnPosts, colIndex) => (
+                <div key={colIndex} className="flex flex-col gap-4">
+                    {columnPosts.map((post) => (
+                        <InsightCard key={post.id} post={post} />
+                    ))}
+                </div>
             ))}
         </div>
     );
